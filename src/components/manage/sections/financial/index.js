@@ -1,6 +1,7 @@
 // Exporta todos os componentes da pasta 'financial'
-export { FinancialPanel } from './financial-panel';
-export { SalesSummary } from './sales-summary';
-export { Coupons } from './coupons';
-export { CancellationRequests } from './cancellation-requests';
+export { FinancialPanel } from './Financial-panel';
+export { SalesSummary } from './Sales-summary';
+export { Coupons } from './Coupons';
+export { CancellationRequests } from './Cancellation-requests';
+
 
