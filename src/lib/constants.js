@@ -4,8 +4,9 @@ import { web3 } from '@coral-xyz/anchor';
 export const PROGRAM_ID = new web3.PublicKey(
   "E6ZWhfnp7MGgoyG26f28SBArvrYgWGoQcmgM8j9F7LTT"
 );
-export const API_URL = "http://localhost:10000";
+export const API_URL = "https://apiteste-27ot.onrender.com";
 export const APP_BASE_URL = "https://ticketfy.app/"
+
 
 
 
