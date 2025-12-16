@@ -58,7 +58,37 @@ export const useCheckout = () => {
 
     fetchEventData();
   }, [eventAddress, navigate, selectedTickets]);
+  const checkPaymentStatus = async () => {
+    // Só verifica se tivermos um ID de pagamento e o status atual não for sucesso
+    if (!purchaseResult?.paymentId || purchaseResult.payment_status === 'approved') return;
 
+    try {
+      // Tenta buscar pelo ID interno ou externo
+      const idToCheck = purchaseResult.paymentId;
+      const response = await fetch(`${API_URL}/api/payments/status/${idToCheck}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+
+        // Se o status mudou para aprovado
+        if (data.isApproved) {
+          toast.success("Pagamento confirmado! Gerando ingresso...");
+          
+          // ATUALIZA O ESTADO -> ISSO VAI MUDAR A TELA DO USUÁRIO AUTOMATICAMENTE
+          setPurchaseResult(prev => ({
+            ...prev,
+            payment_status: 'approved',
+            mintAddress: data.mintAddress,
+            // Se o backend retornar seedPhrase ou outros dados sensíveis aqui, atualize também.
+            // Nota: Por segurança, o endpoint de status talvez não deva retornar a seedPhrase,
+            // a menos que você garanta que o usuário é o dono da sessão.
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Erro silencioso no polling:", error);
+    }
+  };
   // Helpers de Carteira e Auth
   const getUserWallet = () => {
     try {
@@ -192,56 +222,84 @@ export const useCheckout = () => {
   };
 
 
- const getEndpointAndPayload = (externalPaymentData = null) => {
-    
-    // 1. Descobrir ID e Index do Tier Selecionado
+  const getEndpointAndPayload = (externalPaymentData = null) => {
     let tierIndex = 0;
-    let ticketId = null; // UUID do tier para o banco de dados
     
-    const selectedTierEntry = Object.entries(selectedTickets || {}).find(([id, qty]) => qty > 0);
+    const selectedTierEntry = Object.entries(selectedTickets || {}).find(([tierId, quantity]) => quantity > 0);
     
     if (selectedTierEntry) {
-      const [selId] = selectedTierEntry; // selId é o UUID do tier
-      ticketId = selId;
+      const [tierId, quantity] = selectedTierEntry;
+      const tierIndexFromEvent = eventData?.ticketing?.tiers?.findIndex(tier => tier.id === tierId);
       
-      const foundIndex = eventData?.ticketing?.tiers?.findIndex(tier => tier.id === selId);
-      if (foundIndex !== undefined && foundIndex !== -1) {
-        tierIndex = Number(foundIndex);
+      if (tierIndexFromEvent !== undefined && tierIndexFromEvent !== -1) {
+        tierIndex = Number(tierIndexFromEvent);
       }
     }
   
-    // 2. Montar Payload ESTRITO (Sem variações)
     const basePayload = {
       eventAddress,
-      tierIndex,      // Para a Blockchain/Contrato
-      ticketId,       // Para o Banco de Dados (Foreign Key)
+      tierIndex: tierIndex,
       formData,
-      
-      // Dados de pagamento (Se vier do Brick/Externo)
+      // Passa o ID do pagamento que acabou de ser criado no Mercado Pago
       paymentId: externalPaymentData?.internal_id || externalPaymentData?.id, 
       paymentStatus: externalPaymentData?.status,
-      
-      // Se NÃO for grátis, envia dados financeiros padronizados
       ...(!isFree && {
-        paymentMethodId: selectedPaymentMethod, // PADRÃO: paymentMethodId
-        amount: Number(totalPrice.toFixed(2))   // PADRÃO: amount (Float, ex: 45.90)
+        paymentMethod: selectedPaymentMethod,
+        priceBRLCents: Math.round(totalPrice * 100)
       })
     };
   
-    // 3. Selecionar Endpoint (Lógica mantida)
-    let endpoint = '';
-    if (isFree) {
-        endpoint = authType === 'none' ? '/free/new-user' : '/free/existing-user';
-    } else {
-        endpoint = authType === 'none' ? '/paid/new-user' : '/paid/existing-user';
-    }
-
-    // Adiciona wallet se necessário
-    if (authType !== 'none') {
-        basePayload.walletAddress = userWallet || wallet.publicKey?.toString();
-    }
+    // Lógica de endpoint mantida da versão antiga com melhorias
+    if (authType === 'google_wallet' || authType === 'wallet') {
+      const payloadWithWallet = {
+        ...basePayload,
+        walletAddress: userWallet || wallet.publicKey?.toString()
+      };
       
-    return { endpoint, payload: basePayload };
+      // LOG: Payload para usuário com wallet
+      console.log('👛 [PAYLOAD] Usuário com wallet:', {
+        endpoint: isFree ? '/free/existing-user' : '/paid/existing-user',
+        payload: payloadWithWallet,
+        authType,
+        userWallet,
+        hasWallet: !!(userWallet || wallet.publicKey?.toString())
+      });
+      
+      return {
+        endpoint: isFree ? '/free/existing-user' : '/paid/existing-user',
+        payload: payloadWithWallet
+      };
+    } else if (authType === 'google') {
+      const payloadWithStoredWallet = {
+        ...basePayload,
+        walletAddress: userWallet
+      };
+      
+      // LOG: Payload para usuário Google
+      console.log('👤 [PAYLOAD] Usuário Google:', {
+        endpoint: isFree ? '/free/existing-user' : '/paid/existing-user',
+        payload: payloadWithStoredWallet,
+        authType,
+        userWallet
+      });
+      
+      return {
+        endpoint: isFree ? '/free/existing-user' : '/paid/existing-user',
+        payload: payloadWithStoredWallet
+      };
+    } else {
+      // LOG: Payload para novo usuário
+      console.log('🆕 [PAYLOAD] Novo usuário:', {
+        endpoint: isFree ? '/free/new-user' : '/paid/new-user',
+        payload: basePayload,
+        authType: 'none'
+      });
+      
+      return {
+        endpoint: isFree ? '/free/new-user' : '/paid/new-user',
+        payload: basePayload
+      };
+    }
   };
 
   // --- PROCESSO DE COMPRA ATUALIZADO ---
@@ -557,6 +615,7 @@ export const useCheckout = () => {
     ticketSummary,
     totalPrice,
     isFree,
+    checkPaymentStatus,
     ticketQuantity,
     ticketType,
     totalAmount,
