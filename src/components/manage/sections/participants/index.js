@@ -1,5 +1,6 @@
 // Exporta todos os componentes da pasta 'participants'
-export { ParticipantsCheckin } from './participants-checkin';
-export { SendNotification } from './send-notification';
-export { Certificates } from './certificates';
+export { ParticipantsCheckin } from './Participants-checkin';
+export { SendNotification } from './Send-notification';
+export { Certificates } from './Certificates';
+
 
