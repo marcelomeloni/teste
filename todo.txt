@@ -1,0 +1,5 @@
+- Criar tabela de cupons no BD
+- Criar flyer PDF personalizado
+- Criar Ingresso baixavel
+
+- Exibir os ingressos do usuario na pagina my-tickets
