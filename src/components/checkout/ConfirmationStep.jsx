@@ -10,7 +10,8 @@ import {
   FiLoader,
   FiClock, 
   FiCheckCircle,
-  FiRefreshCw
+  FiRefreshCw,
+  FiPackage
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -32,15 +33,22 @@ const ConfirmationStep = ({
   isDownloadingPdf,   
   navigate,
   eventAddress,
-  checkPaymentStatus // ✅ Nova prop recebida do hook
+  checkPaymentStatus
 }) => {
   const [copied, setCopied] = useState(false);
+  
+  // ✅ Calcular se temos múltiplos ingressos
+  const hasMultipleTickets = ticketQuantity > 1;
+  const totalMinted = purchaseResult?.totalMinted || purchaseResult?.mintAddresses?.length || 1;
+  
+  // ✅ Para compatibilidade: usar primeiro mintAddress ou lista
+  const primaryMintAddress = purchaseResult?.mintAddresses?.[0] || purchaseResult?.mintAddress;
+  const mintAddresses = purchaseResult?.mintAddresses || (purchaseResult?.mintAddress ? [purchaseResult.mintAddress] : []);
 
   // --- LÓGICA DO PIX ---
   const pixImage = purchaseResult?.qr_code_base64;
   const pixCode = purchaseResult?.qr_code;
   
-  // Se tiver imagem de QR Code e o status for 'pending' ou 'in_process', é Pix Pendente
   const isPixPending = pixImage && (purchaseResult?.payment_status === 'pending' || purchaseResult?.payment_status === 'in_process');
 
   const copyPixToClipboard = () => {
@@ -53,19 +61,16 @@ const ConfirmationStep = ({
   };
 
   // --- POLLING AUTOMÁTICO ---
-  // Verifica o status a cada 5 segundos se estiver pendente
   useEffect(() => {
     let intervalId;
 
     if (isPixPending && checkPaymentStatus) {
-      // Cria o intervalo
       intervalId = setInterval(() => {
         console.log("🔄 Verificando status do pagamento...");
         checkPaymentStatus();
       }, 5000);
     }
 
-    // Limpa o intervalo ao desmontar ou quando o status mudar
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
@@ -84,18 +89,18 @@ const ConfirmationStep = ({
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Finalize seu pagamento</h2>
           <p className="text-gray-600 mb-6">
-            Escaneie o QR Code abaixo no app do seu banco para garantir seus ingressos.
+            Escaneie o QR Code abaixo no app do seu banco para garantir seus {ticketQuantity} ingresso{hasMultipleTickets ? 's' : ''}.
           </p>
 
           {/* Imagem do QR Code */}
           <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-300 inline-block mb-6 relative">
             <img 
-               src={`data:image/jpeg;base64,${pixImage}`} 
-               alt="QR Code Pix" 
-               className="w-64 h-64 object-contain mx-auto"
+              src={`data:image/jpeg;base64,${pixImage}`} 
+              alt="QR Code Pix" 
+              className="w-64 h-64 object-contain mx-auto"
             />
             <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-white px-2 text-xs text-gray-400 font-medium">
-                QR Code Seguro
+              QR Code Seguro
             </div>
           </div>
 
@@ -128,8 +133,8 @@ const ConfirmationStep = ({
         <div className="mt-8 pt-6 border-t border-gray-100 bg-gray-50 -mx-8 -mb-8 p-6 rounded-b-2xl">
           <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-2 text-blue-700 bg-blue-100 px-4 py-2 rounded-full text-sm font-medium">
-               <FiLoader className="animate-spin" />
-               Aguardando confirmação do banco...
+              <FiLoader className="animate-spin" />
+              Aguardando confirmação do banco...
             </div>
             
             <p className="text-xs text-gray-500 max-w-xs mx-auto">
@@ -163,14 +168,21 @@ const ConfirmationStep = ({
           {isFree ? 'Ingressos Confirmados' : 'Pagamento Aprovado!'}
         </h2>
         <p className="text-gray-600">
-          Os ingressos foram enviados para <strong className="text-gray-900">{formData['field-2']}</strong>
+          {ticketQuantity} ingresso{hasMultipleTickets ? 's' : ''} foram enviados para <strong className="text-gray-900">{formData['field-2']}</strong>
         </p>
+        
+        {hasMultipleTickets && (
+          <div className="mt-3 inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+            <FiPackage className="w-4 h-4" />
+            {ticketQuantity} ingressos emitidos com sucesso
+          </div>
+        )}
       </div>
 
       {/* Resumo do Pedido */}
       <div className="border border-gray-200 rounded-xl p-6 mb-6 bg-gray-50/50">
         <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FiCheckCircle className="text-green-500"/> Resumo do Pedido
+          <FiCheckCircle className="text-green-500"/> Resumo do Pedido
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
@@ -190,21 +202,21 @@ const ConfirmationStep = ({
           <div>
             <span className="text-gray-500 block text-xs uppercase tracking-wide font-semibold mb-1">Ingressos</span>
             <p className="font-medium text-gray-900">
-              {ticketQuantity} x {ticketType}
+              {ticketQuantity} {hasMultipleTickets ? 'unidades de' : 'x'} {ticketType}
             </p>
           </div>
           {!isFree && (
             <div className="md:col-span-2 border-t border-gray-200 pt-3 mt-1">
               <div className="flex justify-between items-center">
-                  <span className="text-gray-600 font-medium">Valor Total Pago:</span>
-                  <p className="font-bold text-lg text-green-600">R$ {totalAmount}</p>
+                <span className="text-gray-600 font-medium">Valor Total Pago:</span>
+                <p className="font-bold text-lg text-green-600">R$ {totalAmount}</p>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Carteira Digital - Exibe apenas se houver seedPhrase (Usuário novo/Google) */}
+      {/* Carteira Digital */}
       {purchaseResult.seedPhrase && (
         <div className="border border-amber-200 rounded-xl p-6 mb-6 bg-amber-50">
           <div className="flex items-center mb-4">
@@ -242,11 +254,6 @@ const ConfirmationStep = ({
                 </div>
               ))}
             </div>
-            
-            {/* Overlay de proteção visual (opcional, remove se quiser sempre visível) */}
-            {/* <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg border border-dashed border-gray-300">
-                <span className="text-sm font-medium text-gray-600">Copie abaixo para salvar</span>
-            </div> */}
           </div>
 
           {/* Botões de Ação para Seed Phrase */}
@@ -281,8 +288,8 @@ const ConfirmationStep = ({
               </code>
               <button 
                 onClick={() => {
-                    navigator.clipboard.writeText(purchaseResult.walletAddress);
-                    toast.success('Endereço copiado!');
+                  navigator.clipboard.writeText(purchaseResult.walletAddress);
+                  toast.success('Endereço copiado!');
                 }}
                 className="p-2.5 text-amber-700 hover:text-amber-900 hover:bg-amber-100 rounded transition-colors"
                 title="Copiar endereço"
@@ -308,6 +315,67 @@ const ConfirmationStep = ({
         </div>
       )}
 
+      {/* ✅ NOVA SEÇÃO: Detalhes dos Ingressos (especialmente para múltiplos) */}
+      {hasMultipleTickets && mintAddresses.length > 0 && (
+        <div className="border border-blue-200 rounded-xl p-6 mb-6 bg-blue-50">
+          <h3 className="font-semibold text-blue-900 mb-4 flex items-center gap-2">
+            <FiPackage className="text-blue-600" /> Seus Ingressos
+          </h3>
+          
+          <div className="space-y-3">
+            <p className="text-sm text-blue-800">
+              Você comprou <strong>{ticketQuantity} ingressos</strong>. Cada ingresso é um NFT único na blockchain.
+            </p>
+            
+            <div className="bg-white p-4 rounded-lg border border-blue-100">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-700">NFTs emitidos:</span>
+                <span className="text-sm font-bold text-blue-700">{mintAddresses.length}</span>
+              </div>
+              
+              <div className="text-xs text-gray-600 mb-3">
+                Cada NFT tem um endereço único que você pode verificar no explorador.
+              </div>
+              
+              {/* Lista de endereços (colapsável) */}
+              <div className="border border-gray-100 rounded-lg overflow-hidden">
+                <button 
+                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-medium text-gray-700"
+                >
+                  <span>Ver endereços dos NFTs</span>
+                  {showTechnicalDetails ? <FiChevronUp /> : <FiChevronDown />}
+                </button>
+                
+                {showTechnicalDetails && (
+                  <div className="p-3 space-y-2 bg-white border-t border-gray-100 max-h-60 overflow-y-auto">
+                    {mintAddresses.map((address, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-500 w-6">#{index + 1}</span>
+                          <code className="text-xs font-mono text-gray-700 truncate flex-1">
+                            {address}
+                          </code>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(address);
+                            toast.success(`Endereço ${index + 1} copiado!`);
+                          }}
+                          className="p-1 text-gray-400 hover:text-blue-600"
+                        >
+                          <FiCopy className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detalhes Técnicos (Ocultos por Padrão) */}
       <div className="border border-gray-200 rounded-xl overflow-hidden mb-6">
         <button 
@@ -320,51 +388,56 @@ const ConfirmationStep = ({
 
         {showTechnicalDetails && (
           <div className="p-4 space-y-4 bg-white animate-fade-in border-t border-gray-200">
-            {purchaseResult.mintAddress && (
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                Endereço do NFT (Mint)
-              </label>
-              <div className="flex items-center space-x-2">
-                <div className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded font-mono text-xs text-gray-600 break-all">
-                  {purchaseResult.mintAddress}
+            {primaryMintAddress && (
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  {hasMultipleTickets ? 'Primeiro NFT (Mint)' : 'Endereço do NFT (Mint)'}
+                </label>
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded font-mono text-xs text-gray-600 break-all">
+                    {primaryMintAddress}
+                  </div>
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(primaryMintAddress)}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                  >
+                    <FiCopy className="w-4 h-4" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => navigator.clipboard.writeText(purchaseResult.mintAddress)}
-                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                >
-                  <FiCopy className="w-4 h-4" />
-                </button>
+                {hasMultipleTickets && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    + {mintAddresses.length - 1} outros NFTs emitidos
+                  </p>
+                )}
               </div>
-            </div>
             )}
             
             {purchaseResult.signature && (
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                Hash da Transação
-              </label>
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded font-mono text-xs text-gray-600 break-all">
-                  {purchaseResult.signature}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Hash da Transação
+                </label>
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded font-mono text-xs text-gray-600 break-all">
+                    {purchaseResult.signature}
+                  </div>
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(purchaseResult.signature)}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                  >
+                    <FiCopy className="w-4 h-4" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => navigator.clipboard.writeText(purchaseResult.signature)}
-                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                <a 
+                  href={`https://solscan.io/tx/${purchaseResult.signature}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline"
                 >
-                  <FiCopy className="w-4 h-4" />
-                </button>
+                  Ver no Solscan (Explorer)
+                  <FiExternalLink className="ml-1 w-3 h-3" />
+                </a>
               </div>
-              <a 
-                href={`https://solscan.io/tx/${purchaseResult.signature}?cluster=devnet`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline"
-              >
-                Ver no Solscan (Explorer)
-                <FiExternalLink className="ml-1 w-3 h-3" />
-              </a>
-            </div>
             )}
           </div>
         )}
@@ -376,11 +449,11 @@ const ConfirmationStep = ({
         <div className="space-y-3 text-sm text-blue-800">
           <div className="flex items-start">
             <div className="w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center mr-3 flex-shrink-0 text-blue-700 font-bold text-xs mt-0.5">1</div>
-            <p>Um e-mail de confirmação foi enviado para você.</p>
+            <p>Um e-mail de confirmação foi enviado para você com {hasMultipleTickets ? 'todos os seus ingressos' : 'seu ingresso'}.</p>
           </div>
           <div className="flex items-start">
             <div className="w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center mr-3 flex-shrink-0 text-blue-700 font-bold text-xs mt-0.5">2</div>
-            <p>Acesse a aba <strong>"Meus Ingressos"</strong> no menu para visualizar seus tickets.</p>
+            <p>Acesse a aba <strong>"Meus Ingressos"</strong> no menu para visualizar {hasMultipleTickets ? 'todos os seus tickets' : 'seu ticket'}.</p>
           </div>
           <div className="flex items-start">
             <div className="w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center mr-3 flex-shrink-0 text-blue-700 font-bold text-xs mt-0.5">3</div>
@@ -402,7 +475,6 @@ const ConfirmationStep = ({
       <div className="flex flex-col md:flex-row gap-4">
         <button
           onClick={() => navigate('/my-tickets')}
-          // Se tiver seed phrase, obriga a marcar o checkbox para sair
           disabled={purchaseResult.seedPhrase && !isSeedPhraseConfirmed}
           className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
         >
@@ -423,7 +495,7 @@ const ConfirmationStep = ({
           ) : (
             <>
               <FiDownload className="w-5 h-5 mr-2" />
-              Baixar Ingresso (PDF)
+              Baixar Ingresso{hasMultipleTickets ? 's' : ''} (PDF)
             </>
           )}
         </button>

@@ -4,7 +4,7 @@ import { initMercadoPago, Payment } from '@mercadopago/sdk-react';
 import { API_URL } from '@/lib/constants'; 
 
 // INICIALIZE COM SUA PUBLIC KEY
-initMercadoPago('APP_USR-b93dcaa4-2f91-4103-9c30-6bed37581e72', { locale: 'pt-BR' });
+initMercadoPago('APP_USR-d1c7345d-d7e5-466d-a344-d8d28b398667', { locale: 'pt-BR' });
 
 const PaymentReview = ({
   eventData,
